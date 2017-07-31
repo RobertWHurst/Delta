@@ -1,26 +1,23 @@
 use std::sync::{Arc,Mutex};
 use std::collections::HashMap;
-use element::Element;
+use super::*;
 
-
-pub enum SceneRenderEntity {
-    Sprite(&'static str),
-    Polygon,
-}
 
 pub struct Scene {
-    pub id  : &'static str,
-    elements: HashMap<&'static str, Arc<Mutex<Element>>>,
+    pub id  : String,
+    elements: HashMap<String, Arc<Mutex<Element>>>,
 }
 
 impl Scene {
-    pub fn new(id: &'static str) -> Scene {
+    pub fn new<S: Into<String>>(id: S) -> Scene {
         Scene {
-            id      : id,
+            id      : id.into(),
             elements: HashMap::new()
         }
     }
-    pub fn render(&self, width: usize, height: usize) -> Vec<Vec<SceneRenderEntity>> {
+    pub fn render<F: Into<f64>>(&self, width_f: F, height_f: F) -> Vec<Vec<RenderEntity>> {
+        let width              = width_f.into();
+        let height             = height_f.into();
         let z_range            = self.get_z_range();
         let mut element_layers = Vec::with_capacity(z_range.len());
         for z in z_range {
@@ -28,7 +25,7 @@ impl Scene {
             for element_arc in self.elements.values() {
                 let element_clone = element_arc.clone();
                 let element       = element_clone.lock().unwrap();
-                if element.x < width as f64 && element.y < height as f64 && element.z == z {
+                if element.x < width && element.y < height && element.z == z {
                     element_layer.push(element.render());
                 }
             }
@@ -37,10 +34,10 @@ impl Scene {
         element_layers
     }
     pub fn add_element(&mut self, element: Element) {
-        self.elements.insert(element.id, Arc::new(Mutex::new(element)));
+        self.elements.insert(element.id.clone(), Arc::new(Mutex::new(element)));
     }
-    pub fn remove_element(&mut self, element_id: &'static str) -> Option<Element> {
-        let mut element_arc = match self.elements.remove(element_id) {
+    pub fn remove_element<'a, S: Into<&'a str>>(&mut self, element_id: S) -> Option<Element> {
+        let mut element_arc = match self.elements.remove(element_id.into()) {
             Some(element_arc) => element_arc,
             None              => { return None; },
         };
@@ -57,7 +54,7 @@ impl Scene {
             Err(_)      => None
         }
     }
-    fn get_z_range(&self) -> Vec<f64> {
+    fn get_z_range(&self) -> Vec<u32> {
         let mut z_values = Vec::new();
         for element_arc in self.elements.values() {
             let element_clone = element_arc.clone();

@@ -2,7 +2,9 @@
 name = "delta"
 version = "0.1.0"
 authors = ["Robert Hurst <robertwhurst@gmail.com>"]
+description = "Delta is a 2D game engine written in Rust"
 
 [dependencies]
-glutin = "*"
-gl = "*"
+gl = "0.6.3"
+glutin = "0.9.2"
+image = "0.14.0"
