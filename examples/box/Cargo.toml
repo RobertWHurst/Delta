@@ -1,0 +1,7 @@
+[package]
+name = "example"
+version = "0.1.0"
+authors = ["Robert Hurst <robertwhurst@gmail.com>"]
+
+[dependencies]
+delta = { path = "../../" }
