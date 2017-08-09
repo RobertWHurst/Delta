@@ -1,0 +1,12 @@
+[package]
+name = "delta"
+version = "0.1.0"
+authors = ["Robert Hurst <robertwhurst@gmail.com>"]
+description = "Delta is a 2D game engine written in Rust"
+
+[dependencies]
+gl = "0.6"
+glutin = "0.9"
+image = "0.14"
+time = "0.1"
+rayon = "0.8.2"
