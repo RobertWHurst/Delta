@@ -1,65 +1,63 @@
-use std::collections::hash_map::{self, HashMap};
-use rayon::prelude::*;
+use std::cmp;
+use std::fmt;
+use position::Position;
 use sprite::Sprite;
+use controller::Controller;
+use velocity::Velocity;
 
-#[derive(Clone)]
-pub struct Element<C> {
+pub struct Element {
     id: String,
-    position: Position,
-    velocity: Velocity,
+    pub(crate) position: Position,
+    pub(crate) velocity: Velocity,
     sprite: Option<Sprite>,
-    controller: C,
+    controller: Box<Controller>,
 }
 
-impl<C> Element<C>
-where
-    C: Controller,
-{
-    pub fn new<S>(id: S, controller: C) -> Element<C>
+impl Element {
+    pub fn new<S, C>(id: S, controller: C) -> Self
     where
         S: Into<String>,
+        C: 'static + Controller,
     {
-        Element {
+        Self {
             id: id.into(),
             position: Position::default(),
             velocity: Velocity::default(),
             sprite: None,
-            controller: controller,
+            controller: box controller,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct Position {
-    pub x: f64,
-    pub y: f64,
-    pub layer: u8,
+impl PartialOrd for Element {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct Velocity {
-    pub rad: f64,
-    pub amp: f64,
+impl Ord for Element {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
 }
 
-pub trait Controller {
-    fn tick(&mut self, fn(ControllerApi)) {}
-    fn load(&mut self, fn(ControllerApi)) {}
-    fn unload(&mut self, fn(ControllerApi)) {}
-    fn message(&mut self, fn(ControllerApi)) {}
+impl PartialEq for Element {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
-pub struct ControllerApi {
-    element_position: Position,
-    element_velocity: Velocity,
-}
+impl Eq for Element {}
 
-impl ControllerApi {
-    pub fn new<C>(element: &Element<C>) -> Self {
-        Self {
-            element_position: element.position,
-            element_velocity: element.velocity,
-        }
+impl fmt::Debug for Element {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Element {{ id: {} position: {:?}, velocity: {:?} }}",
+            self.id,
+            self.position,
+            self.velocity,
+        )
     }
 }
 
