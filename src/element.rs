@@ -1,23 +1,26 @@
 use std::cmp;
 use std::fmt;
+use std::sync::{Arc, Mutex};
 use position::Position;
 use sprite::Sprite;
 use controller::Controller;
 use velocity::Velocity;
 
+pub(crate) type ElementArc = Arc<Mutex<Element>>;
+
 pub struct Element {
-    id: String,
+    pub(crate) id: String,
     pub(crate) position: Position,
     pub(crate) velocity: Velocity,
-    sprite: Option<Sprite>,
-    controller: Box<Controller>,
+    pub(crate) sprite: Option<Sprite>,
+    pub(crate) controller: Box<Controller + Send>,
 }
 
 impl Element {
     pub fn new<S, C>(id: S, controller: C) -> Self
     where
         S: Into<String>,
-        C: 'static + Controller,
+        C: 'static + Controller + Send,
     {
         Self {
             id: id.into(),
