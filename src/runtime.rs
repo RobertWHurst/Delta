@@ -19,7 +19,7 @@ impl Runtime {
         self.scene = Some(scene);
     }
 
-    pub fn create_tick_worker_pool(&mut self, num_worker_threads_opt: Option<usize>) {
+    pub fn start(&mut self, num_worker_threads_opt: Option<usize>) {
         let num_worker_threads = match num_worker_threads_opt {
             Some(n) => n,
             None => num_cpus::get() - 2,
@@ -27,7 +27,9 @@ impl Runtime {
 
         self.tick_workers = (0..num_worker_threads)
             .into_iter()
-            .map(|_| Worker::new())
+            .map(|i| {
+                Worker::new(i, self.scene.as_ref().unwrap().get_elements())
+            })
             .collect();
     }
 }

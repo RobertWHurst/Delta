@@ -1,24 +1,52 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 use element::Element;
-use position::Position;
-use velocity::Velocity;
 
 pub trait Controller {
-    fn tick(&mut self, fn(ControllerApi)) {}
-    fn load(&mut self, fn(ControllerApi)) {}
-    fn unload(&mut self, fn(ControllerApi)) {}
-    fn message(&mut self, fn(ControllerApi)) {}
+    fn tick(&mut self, Api) {}
+    fn load(&mut self, Api) {}
+    fn unload(&mut self, Api) {}
+    fn message(&mut self, Api) {}
 }
 
-pub struct ControllerApi {
-    element_position: Position,
-    element_velocity: Velocity,
+pub struct Api {
+    worker_index: usize,
+    elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+    tick_delta: f64,
 }
 
-impl ControllerApi {
-    pub fn new<C>(element: &Element) -> Self {
+impl Api {
+    pub fn new(
+        worker_index: usize,
+        elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+    ) -> Self {
         Self {
-            element_position: element.position,
-            element_velocity: element.velocity,
+            worker_index,
+            elements_mx,
+            tick_delta: 0.,
         }
+    }
+
+    pub fn worker_index(&self) -> usize {
+        self.worker_index
+    }
+
+    pub fn t(&self) -> f64 {
+        self.tick_delta
+    }
+
+    pub fn get_element<S>(&self, id: S) -> Option<Arc<Mutex<Element>>>
+    where
+        S: Into<String>,
+    {
+        let elements_mx = self.elements_mx.read().unwrap();
+        match elements_mx.get(&id.into()) {
+            Some(e) => Some(e.to_owned()),
+            None => None,
+        }
+    }
+
+    pub fn set_tick_delta(&mut self, tick_delta: f64) {
+        self.tick_delta = tick_delta;
     }
 }

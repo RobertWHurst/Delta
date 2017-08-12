@@ -1,102 +1,69 @@
+use std::collections::HashMap;
 use std::thread::{spawn, JoinHandle};
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{channel, Sender, Receiver};
-use element::ElementArc;
-
-type InnerSenderArc = Arc<Mutex<Sender<OutMessage>>>;
-type InnerReceiverArc = Arc<Mutex<Receiver<InMessage>>>;
-
-enum InMessage {
-    Exit,
-    RequestedElement { id: String, element_mut: ElementArc },
-    ExecuteElementTick { delta: f64, element_mut: ElementArc },
-}
-
-enum OutMessage {
-    GetElement { id: String },
-    DestroyElement { id: String },
-    CreateElement { element_mut: ElementArc },
-}
-
-pub struct WorkerApi {
-    sender_mut: InnerSenderArc,
-    receiver_mut: InnerReceiverArc,
-}
-
-impl WorkerApi {
-    fn new(inner_sender: Sender<OutMessage>, inner_receiver: Receiver<InMessage>) -> Self {
-        let inner_sender_mut = Arc::new(Mutex::new(inner_sender));
-        let inner_receiver_mut = Arc::new(Mutex::new(inner_receiver));
-
-        Self {
-            sender_mut: inner_sender_mut.clone(),
-            receiver_mut: inner_receiver_mut.clone(),
-        }
-    }
-
-    fn recv(&self) -> Result<InMessage, ()> {
-        let reciever = match self.receiver_mut.lock() {
-            Ok(r) => r,
-            Err(_) => return Err(()),
-        };
-        match reciever.recv() {
-            Ok(m) => Ok(m),
-            Err(_) => Err(()),
-        }
-    }
-}
+use std::sync::{Arc, Mutex, RwLock};
+use element::Element;
+use controller::Api;
 
 pub struct Worker {
-    sender: Sender<InMessage>,
-    receiver: Receiver<OutMessage>,
-    join_handle: JoinHandle<()>,
+    end_worker_thread: Arc<Mutex<bool>>,
+    join_handle: Option<JoinHandle<()>>,
 }
 
 impl Worker {
-    pub(crate) fn new() -> Worker {
-        let (inner_sender, outer_receiver) = channel();
-        let (outer_sender, inner_receiver) = channel();
+    pub fn new(
+        worker_index: usize,
+        elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+    ) -> Self {
+        let end_worker_thread = Arc::new(Mutex::new(false));
 
-        let api = WorkerApi::new(inner_sender, inner_receiver);
-
-        let join_handle = spawn(move || Self::init(api));
-
-        Worker {
-            sender: outer_sender,
-            receiver: outer_receiver,
-            join_handle,
+        Self {
+            end_worker_thread: end_worker_thread.clone(),
+            join_handle: Some(spawn(move || {
+                WorkerController::new(worker_index, end_worker_thread, elements_mx).start()
+            })),
         }
     }
 
-    pub(crate) fn tick(delta: f64, element_group: ElementArc) {}
+    pub fn end(&mut self) {
+        *self.end_worker_thread.lock().unwrap() = true;
+        self.join_handle.take().unwrap().join().unwrap();
+    }
+}
 
-    pub(crate) fn kill(&self) -> Result<(), ()> {
-        match self.sender.send(InMessage::Exit) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(()),
+struct WorkerController {
+    worker_index: usize,
+    end_worker_thread: Arc<Mutex<bool>>,
+    elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+}
+
+impl WorkerController {
+    fn new(
+        worker_index: usize,
+        end_worker_thread: Arc<Mutex<bool>>,
+        elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+    ) -> Self {
+        Self {
+            worker_index,
+            end_worker_thread,
+            elements_mx,
         }
     }
-
-    fn init(api: WorkerApi) {
+    fn should_exit(&self) -> bool {
+        *self.end_worker_thread.lock().unwrap()
+    }
+    fn start(&self) {
         loop {
-            let message = match api.recv() {
-                Ok(m) => m,
-                Err(_) => break,
-            };
+            if self.should_exit() {
+                break;
+            }
 
-            let (delta, element_mut) = match message {
-                InMessage::ExecuteElementTick { delta, element_mut } => (delta, element_mut),
-                InMessage::Exit => break,
-                InMessage::RequestedElement { id, element_mut } => unreachable!(),
-            };
+            let elements = self.elements_mx.read().unwrap();
 
-            let mut element = match element_mut.lock() {
-                Ok(e) => e,
-                Err(_) => continue,
-            };
-
-
-            print!("Delta: {:?} Element: {:?}", delta, element);
+            for element_mx in elements.values() {
+                let api = Api::new(self.worker_index, self.elements_mx.clone());
+                let mut element = element_mx.lock().unwrap();
+                element.tick(api);
+            }
         }
     }
 }

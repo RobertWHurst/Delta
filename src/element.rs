@@ -1,12 +1,11 @@
 use std::cmp;
 use std::fmt;
-use std::sync::{Arc, Mutex};
 use position::Position;
 use sprite::Sprite;
 use controller::Controller;
 use velocity::Velocity;
-
-pub(crate) type ElementArc = Arc<Mutex<Element>>;
+use controller::Api;
+use time::PreciseTime;
 
 pub struct Element {
     pub(crate) id: String,
@@ -14,6 +13,7 @@ pub struct Element {
     pub(crate) velocity: Velocity,
     pub(crate) sprite: Option<Sprite>,
     pub(crate) controller: Box<Controller + Send>,
+    last_tick_at: Option<PreciseTime>,
 }
 
 impl Element {
@@ -28,7 +28,29 @@ impl Element {
             velocity: Velocity::default(),
             sprite: None,
             controller: box controller,
+            last_tick_at: None,
         }
+    }
+    pub fn tick(&mut self, mut api: Api) {
+        let tick_at = PreciseTime::now();
+
+        let last_tick_at = match self.last_tick_at {
+            Some(t) => t,
+            None => {
+                self.last_tick_at = Some(tick_at);
+                return;
+            }
+        };
+        self.last_tick_at = Some(tick_at);
+
+        let tick_duration = last_tick_at.to(tick_at);
+
+        let delta_time_nanos = tick_duration.num_nanoseconds().unwrap_or(i64::max_value());
+        let delta_time_seconds = delta_time_nanos as f64 / 1000. / 1000. / 1000.;
+
+        api.set_tick_delta(delta_time_seconds);
+
+        self.controller.tick(api);
     }
 }
 
