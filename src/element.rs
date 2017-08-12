@@ -8,11 +8,11 @@ use controller::Api;
 use time::PreciseTime;
 
 pub struct Element {
-    pub(crate) id: String,
-    pub(crate) position: Position,
-    pub(crate) velocity: Velocity,
-    pub(crate) sprite: Option<Sprite>,
-    pub(crate) controller: Box<Controller + Send>,
+    pub id: String,
+    pub position: Position,
+    pub velocity: Velocity,
+    pub sprite: Option<Sprite>,
+    controller: Box<Controller + Send>,
     last_tick_at: Option<PreciseTime>,
 }
 
