@@ -27,9 +27,7 @@ impl Runtime {
 
         self.tick_workers = (0..num_worker_threads)
             .into_iter()
-            .map(|i| {
-                Worker::new(i, self.scene.as_ref().unwrap().get_elements())
-            })
+            .map(|i| Worker::new(i, self.scene.as_ref().unwrap().elements()))
             .collect();
     }
 }

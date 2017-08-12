@@ -2,25 +2,26 @@ extern crate delta;
 
 use delta::*;
 
-struct BoxController {
-    id: &'static str,
-}
+struct BoxController {}
 
 impl Controller for BoxController {
-    fn tick(&mut self, api: Api) {
+    fn tick(&mut self, element_api: ElementApi, controller_api: ControllerApi) {
         println!(
-            "id: {:?} t: {:?}, worker_index: {:?}",
-            self.id,
-            api.t(),
-            api.worker_index()
+            "thread: {:?}, element_id: {:?} tick_delta: {:?}",
+            controller_api.worker_index(),
+            element_api.id(),
+            controller_api.t(),
         );
+        // if element_api.id() == "box1" {
+        //     println!("{:?}", controller_api.get_element("box2"));
+        // }
         // for _ in 0..10000000 {}
     }
 }
 
 fn main() {
-    let box_ctrl_1 = BoxController { id: "1" };
-    let box_ctrl_2 = BoxController { id: "2" };
+    let box_ctrl_1 = BoxController {};
+    let box_ctrl_2 = BoxController {};
 
     let box_el_1 = Element::new("box1", box_ctrl_1);
     let box_el_2 = Element::new("box2", box_ctrl_2);

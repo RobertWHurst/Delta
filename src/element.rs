@@ -1,17 +1,23 @@
 use std::cmp;
 use std::fmt;
+use std::sync::{Arc, Mutex};
 use position::Position;
 use sprite::Sprite;
 use controller::Controller;
 use velocity::Velocity;
-use controller::Api;
+use controller::ControllerApi;
 use time::PreciseTime;
 
-pub struct Element {
-    pub id: String,
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ElementState {
     pub position: Position,
     pub velocity: Velocity,
     pub sprite: Option<Sprite>,
+}
+
+pub struct Element {
+    id: String,
+    state_mx: Arc<Mutex<ElementState>>,
     controller: Box<Controller + Send>,
     last_tick_at: Option<PreciseTime>,
 }
@@ -24,14 +30,25 @@ impl Element {
     {
         Self {
             id: id.into(),
-            position: Position::default(),
-            velocity: Velocity::default(),
-            sprite: None,
+            state_mx: Arc::new(Mutex::new(ElementState::default())),
             controller: box controller,
             last_tick_at: None,
         }
     }
-    pub fn tick(&mut self, mut api: Api) {
+
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn controller(&mut self) -> &mut Box<Controller + Send> {
+        &mut self.controller
+    }
+
+    pub fn api(&self) -> ElementApi {
+        ElementApi::new(self.id(), ElementData::ElementState(self.state_mx.clone()))
+    }
+
+    pub fn tick(&mut self, mut controller_api: ControllerApi) {
         let tick_at = PreciseTime::now();
 
         let last_tick_at = match self.last_tick_at {
@@ -48,9 +65,11 @@ impl Element {
         let delta_time_nanos = tick_duration.num_nanoseconds().unwrap_or(i64::max_value());
         let delta_time_seconds = delta_time_nanos as f64 / 1000. / 1000. / 1000.;
 
-        api.set_tick_delta(delta_time_seconds);
+        controller_api.set_tick_delta(delta_time_seconds);
 
-        self.controller.tick(api);
+        let element_api = self.api();
+
+        self.controller.tick(element_api, controller_api);
     }
 }
 
@@ -78,25 +97,50 @@ impl fmt::Debug for Element {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Element {{ id: {} position: {:?}, velocity: {:?} }}",
+            "Element {{ id: {} state: {:?} }}",
             self.id,
-            self.position,
-            self.velocity,
+            self.state_mx,
         )
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug)]
+pub enum ElementData {
+    Element(Arc<Mutex<Element>>),
+    ElementState(Arc<Mutex<ElementState>>),
+}
 
-    struct BoxController {}
-    impl Controller for BoxController {}
+#[derive(Debug)]
+pub struct ElementApi {
+    id: String,
+    data: ElementData,
+}
 
-    #[test]
-    fn create_element() {
-        let box_controller = BoxController {};
+impl ElementApi {
+    pub fn new<S>(into_id: S, data: ElementData) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            id: into_id.into(),
+            data,
+        }
+    }
 
-        Element::new("box", box_controller);
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn state(&self) -> Arc<Mutex<ElementState>> {
+        match &self.data {
+            &ElementData::Element(ref e) => e.lock().unwrap().state_mx.clone(),
+            &ElementData::ElementState(ref s) => s.clone(),
+        }
+    }
+
+    pub fn position(&self) -> Position {
+        let state_mx = self.state();
+        let state = state_mx.lock().unwrap();
+        state.position
     }
 }

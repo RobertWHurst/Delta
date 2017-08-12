@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::thread::{spawn, JoinHandle};
 use std::sync::{Arc, Mutex, RwLock};
 use element::Element;
-use controller::Api;
+use controller::ControllerApi;
 
 pub struct Worker {
     end_worker_thread: Arc<Mutex<bool>>,
@@ -51,6 +51,7 @@ impl WorkerController {
     fn should_exit(&self) -> bool {
         *self.end_worker_thread.lock().unwrap()
     }
+
     fn start(&self) {
         loop {
             if self.should_exit() {
@@ -60,9 +61,17 @@ impl WorkerController {
             let elements = self.elements_mx.read().unwrap();
 
             for element_mx in elements.values() {
-                let api = Api::new(self.worker_index, self.elements_mx.clone());
-                let mut element = element_mx.lock().unwrap();
-                element.tick(api);
+                let mut element = match element_mx.try_lock() {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+
+                let id = element.id();
+                element.tick(ControllerApi::new(
+                    self.worker_index,
+                    id,
+                    self.elements_mx.clone(),
+                ));
             }
         }
     }

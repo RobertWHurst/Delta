@@ -55,3 +55,11 @@ impl fmt::Debug for Sprite {
         }
     }
 }
+
+impl PartialEq for Sprite {
+    fn eq(&self, other: &Self) -> bool {
+        self.source_path == other.source_path && self.source_bounds == other.source_bounds
+    }
+}
+
+impl Eq for Sprite {}

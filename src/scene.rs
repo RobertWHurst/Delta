@@ -18,16 +18,20 @@ impl Scene {
         }
     }
 
-    pub fn get_elements(&self) -> Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>> {
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn elements(&self) -> Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>> {
         self.elements.clone()
     }
 
     pub fn add_element(&self, element: Element) -> Result<(), ()> {
         let mut elements = self.elements.write().unwrap();
-        if elements.contains_key(&element.id) {
+        if elements.contains_key(&element.id()) {
             return Err(());
         }
-        elements.insert(element.id.clone(), Arc::new(Mutex::new(element)));
+        elements.insert(element.id(), Arc::new(Mutex::new(element)));
         Ok(())
     }
 
@@ -51,13 +55,4 @@ impl Scene {
             None => None,
         }
     }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn get_element_groups() {}
 }
