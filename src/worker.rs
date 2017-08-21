@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::thread::{spawn, JoinHandle};
 use std::sync::{Arc, Mutex, RwLock};
-use element::Element;
+use scene::Scene;
 use controller::ControllerApi;
 
 pub struct Worker {
@@ -10,16 +9,13 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn new(
-        worker_index: usize,
-        elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
-    ) -> Self {
+    pub fn new(worker_index: usize, scene_mx: Arc<RwLock<Option<Scene>>>) -> Self {
         let end_worker_thread = Arc::new(Mutex::new(false));
 
         Self {
             end_worker_thread: end_worker_thread.clone(),
             join_handle: Some(spawn(move || {
-                WorkerController::new(worker_index, end_worker_thread, elements_mx).start()
+                WorkerController::new(worker_index, end_worker_thread, scene_mx).start()
             })),
         }
     }
@@ -33,19 +29,19 @@ impl Worker {
 struct WorkerController {
     worker_index: usize,
     end_worker_thread: Arc<Mutex<bool>>,
-    elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+    scene_mx: Arc<RwLock<Option<Scene>>>,
 }
 
 impl WorkerController {
     fn new(
         worker_index: usize,
         end_worker_thread: Arc<Mutex<bool>>,
-        elements_mx: Arc<RwLock<HashMap<String, Arc<Mutex<Element>>>>>,
+        scene_mx: Arc<RwLock<Option<Scene>>>,
     ) -> Self {
         Self {
             worker_index,
             end_worker_thread,
-            elements_mx,
+            scene_mx,
         }
     }
     fn should_exit(&self) -> bool {
@@ -58,7 +54,13 @@ impl WorkerController {
                 break;
             }
 
-            let elements = self.elements_mx.read().unwrap();
+            let scene_grd = self.scene_mx.read().unwrap();
+            let scene = match *scene_grd {
+                Some(ref s) => s,
+                None => continue,
+            };
+            let elements_mx = scene.elements();
+            let elements = elements_mx.read().unwrap();
 
             for element_mx in elements.values() {
                 let mut element = match element_mx.try_lock() {
@@ -70,7 +72,7 @@ impl WorkerController {
                 element.tick(ControllerApi::new(
                     self.worker_index,
                     id,
-                    self.elements_mx.clone(),
+                    elements_mx.clone(),
                 ));
             }
         }
